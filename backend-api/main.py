@@ -94,7 +94,7 @@ async def detect_image(file: UploadFile=File(...)):
                     # "timestamp": str(datetime.utcnow())
                 }
             )
-            print("n8n response:", res.status_code, res.text)
+            print("n8n response:", res.status_code, res.text) 
         except Exception as e:
             print("Error calling n8n:", e)      
 
