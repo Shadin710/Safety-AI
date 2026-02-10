@@ -6,12 +6,15 @@ import os
 import uuid
 from db import SessionLocal
 from models import Event
+import requests
+from datetime import datetime
+ 
 
 # loading fastapi
 app =FastAPI()
 
 # loading YOLO model
-model = YOLO("yolov8n.pt")
+model = YOLO("last.pt")
 
 app.add_middleware(
     CORSMiddleware,
@@ -40,15 +43,20 @@ async def detect_image(file: UploadFile=File(...)):
 
     detections = []
     db= SessionLocal()
+    labels = []
     for r in results:
         for box in r.boxes:
-
             label =model.names[int(box.cls)]
+            labels.append(model.names[int(box.cls)])
             confidence = float(box.conf)
-
-            event_type = "DETECTION"
-            severity ="LOW"
-
+            detections.append({
+                "label": model.names[int(box.cls)],
+                "confidence": float(box.conf),
+                "bbox": box.xyxy.tolist()
+            })
+        if "Person" in labels and "NO-Hardhat" in labels:
+            event_type = "PPE_VIOLATION"
+            severity = "HIGH"
             event = Event(
                 event_type=event_type,
                 severity=severity,
@@ -58,11 +66,38 @@ async def detect_image(file: UploadFile=File(...)):
             )
 
             db.add(event)
-            detections.append({
-                "label": model.names[int(box.cls)],
-                "confidence": float(box.conf),
-                "bbox": box.xyxy.tolist()
-            })
+        elif "Person" in labels and "NO-Safety Vest" in labels:
+            event_type = "PPE_VIOLATION"
+            severity = "HIGH"
+            event = Event(
+                event_type=event_type,
+                severity=severity,
+                label=label,
+                confidence = confidence,
+                image_path=filepath
+            )
+
+            db.add(event)
+
+        else:
+            event_type ="Normal"
+            severity = "LOW"
+    print(severity) 
+    if severity == "HIGH":
+        try:
+            res = requests.post(
+                "http://localhost:5678/webhook-test/safety-ai",
+                json={
+                    "event_type": event_type,
+                    "severity": severity,
+                    "camera": "Pit-A", 
+                    # "timestamp": str(datetime.utcnow())
+                }
+            )
+            print("n8n response:", res.status_code, res.text)
+        except Exception as e:
+            print("Error calling n8n:", e)      
+
     db.commit()
     db.close()
 
@@ -82,7 +117,7 @@ def get_events():
             "label": e.label,
             "confidence": e.confidence,
             "image_path": e.image_path,
-            "timestamp": e.timestamp
+            # "timetime_stampstamp": e.time_stamp
         }
         for e in events
     ]
