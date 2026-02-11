@@ -8,13 +8,13 @@ from db import SessionLocal
 from models import Event
 import requests
 from datetime import datetime
- 
+from detect_image import detect_violation
+
 
 # loading fastapi
 app =FastAPI()
 
-# loading YOLO model
-model = YOLO("last.pt")
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -38,50 +38,8 @@ async def detect_image(file: UploadFile=File(...)):
     
     img = cv2.imread(filepath)
 
-    # will load this model in executor in future
-    results = model(img)
-
-    detections = []
-    db= SessionLocal()
-    labels = []
-    for r in results:
-        for box in r.boxes:
-            label =model.names[int(box.cls)]
-            labels.append(model.names[int(box.cls)])
-            confidence = float(box.conf)
-            detections.append({
-                "label": model.names[int(box.cls)],
-                "confidence": float(box.conf),
-                "bbox": box.xyxy.tolist()
-            })
-        if "Person" in labels and "NO-Hardhat" in labels:
-            event_type = "PPE_VIOLATION"
-            severity = "HIGH"
-            event = Event(
-                event_type=event_type,
-                severity=severity,
-                label=label,
-                confidence = confidence,
-                image_path=filepath
-            )
-
-            db.add(event)
-        elif "Person" in labels and "NO-Safety Vest" in labels:
-            event_type = "PPE_VIOLATION"
-            severity = "HIGH"
-            event = Event(
-                event_type=event_type,
-                severity=severity,
-                label=label,
-                confidence = confidence,
-                image_path=filepath
-            )
-
-            db.add(event)
-
-        else:
-            event_type ="Normal"
-            severity = "LOW"
+    
+    severity, event_type, detections = detect_violation(img,filepath)
     print(severity) 
     if severity == "HIGH":
         try:
@@ -98,10 +56,55 @@ async def detect_image(file: UploadFile=File(...)):
         except Exception as e:
             print("Error calling n8n:", e)      
 
-    db.commit()
-    db.close()
 
     return {"detections": detections}
+
+
+@app.post("/detect-videos")
+async def detect_videos(file: UploadFile=File(...)):
+    filename = f"{uuid.uuid4()}.mp4"
+    filepath= os.path.join("uploads/videos",filename)
+    
+    # opening the file
+    with open (filepath,"wb") as f:
+        f.write(await file.read())
+    
+    cap  = cv2.VideoCapture(filepath)
+
+    frame_count=0
+    violations = 0
+
+
+    while cap.isOpened():
+        ret,frame = cap.read()
+        if not ret:
+            break
+        frame_count+=1
+
+        
+        if frame_count%30 !=0:
+            continue
+
+        severity,event_type,detections = detect_image(frame)
+        if severity == "HIGH":
+            violations += 1
+        
+        if violations>=60:
+            violations=0
+            try:
+                res = requests.post(
+                    "http://localhost:5678/webhook-test/safety-ai",
+                    json={
+                        "event_type": event_type,
+                        "severity": severity,
+                        "camera": "Pit-A", 
+                        # "timestamp": str(datetime.utcnow())
+                    }
+                )
+                print("n8n response:", res.status_code, res.text) 
+            except Exception as e:
+                print("Error calling n8n:", e)   
+            
 
 @app.get("/events")
 def get_events():

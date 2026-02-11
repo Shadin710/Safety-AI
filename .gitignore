@@ -1,2 +1,4 @@
 ml-training
 runs
+./backend-api/uploads
+./frontend/node_modules
