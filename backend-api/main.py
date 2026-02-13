@@ -51,7 +51,7 @@ async def detect_image(file: UploadFile=File(...)):
                     "camera": "Pit-A", 
                     # "timestamp": str(datetime.utcnow())
                 }
-            )
+            ) 
             print("n8n response:", res.status_code, res.text) 
         except Exception as e:
             print("Error calling n8n:", e)      
@@ -85,7 +85,7 @@ async def detect_videos(file: UploadFile=File(...)):
         if frame_count%30 !=0:
             continue
 
-        severity,event_type,detections = detect_image(frame)
+        severity,event_type,detections = detect_violation(frame,filepath)
         if severity == "HIGH":
             violations += 1
         
@@ -103,7 +103,9 @@ async def detect_videos(file: UploadFile=File(...)):
                 )
                 print("n8n response:", res.status_code, res.text) 
             except Exception as e:
-                print("Error calling n8n:", e)   
+                print("Error calling n8n:", e)
+    return {"detections": detections}
+         
             
 
 @app.get("/events")

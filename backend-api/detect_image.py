@@ -20,11 +20,12 @@ def detect_violation(img,filepath):
             label =model.names[int(box.cls)]
             labels.append(model.names[int(box.cls)])
             confidence = float(box.conf)
-            detections.append({
-                "label": model.names[int(box.cls)],
-                "confidence": float(box.conf),
-                "bbox": box.xyxy.tolist()
-            })
+            if label != "Person" and label!="Hardhat" and label!="machinery":
+                detections.append({
+                    "label": model.names[int(box.cls)],
+                    "confidence": float(box.conf),
+                    "bbox": box.xyxy.tolist()
+                })
         if "Person" in labels and "NO-Hardhat" in labels:
             event_type = "PPE_VIOLATION"
             severity = "HIGH"
@@ -32,7 +33,7 @@ def detect_violation(img,filepath):
                 event_type=event_type,
                 severity=severity,
                 label=label,
-                confidence = confidence,
+                confidence = confidence, 
                 image_path=filepath
             )
 

@@ -66,7 +66,7 @@ function VideoDetection() {
     formData.append("file", file);
 
     try {
-      const res = await fetch("http://127.0.0.1:8001/detect-video", {
+      const res = await fetch("http://127.0.0.1:8001/detect-videos", {
         method: "POST",
         body: formData,
       });

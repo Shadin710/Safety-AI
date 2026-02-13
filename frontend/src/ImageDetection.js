@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import "./ImageDetection.css";
 
 function ImageDetection() {
@@ -13,15 +13,16 @@ function ImageDetection() {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showNotificationAlert, setShowNotificationAlert] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState("");
+  const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
+  const canvasRef = useRef(null);
+  const imageRef = useRef(null);
 
   useEffect(() => {
-    // Load history from localStorage
     const savedHistory = localStorage.getItem("ppeHistory");
     if (savedHistory) {
       setHistory(JSON.parse(savedHistory));
     }
 
-    // Load dark mode preference
     const savedDarkMode = localStorage.getItem("darkMode");
     if (savedDarkMode === "true") {
       setDarkMode(true);
@@ -30,7 +31,6 @@ function ImageDetection() {
   }, []);
 
   useEffect(() => {
-    // Auto-hide notification alert after 5 seconds
     if (showNotificationAlert) {
       const timer = setTimeout(() => {
         setShowNotificationAlert(false);
@@ -39,16 +39,35 @@ function ImageDetection() {
     }
   }, [showNotificationAlert]);
 
+  useEffect(() => {
+    if (detections.length > 0 && imageRef.current && canvasRef.current && preview) {
+      // Small delay to ensure image is rendered
+      setTimeout(() => {
+        drawBoundingBoxes();
+      }, 100);
+    }
+  }, [detections, imageSize, preview]);
+
+  useEffect(() => {
+    // Redraw on window resize
+    const handleResize = () => {
+      if (detections.length > 0) {
+        drawBoundingBoxes();
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [detections]);
+
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
-      // Validate file size (max 10MB)
       if (selectedFile.size > 10 * 1024 * 1024) {
         alert("File size must be less than 10MB");
         return;
       }
 
-      // Validate file type
       const validTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
       if (!validTypes.includes(selectedFile.type)) {
         alert("Please upload a valid image file (JPEG, PNG, WEBP)");
@@ -59,13 +78,119 @@ function ImageDetection() {
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreview(reader.result);
+        setDetections([]);
+        
+        const img = new Image();
+        img.onload = () => {
+          setImageSize({ width: img.width, height: img.height });
+        };
+        img.src = reader.result;
       };
       reader.readAsDataURL(selectedFile);
     }
   };
 
+  const drawBoundingBoxes = () => {
+    const canvas = canvasRef.current;
+    const image = imageRef.current;
+    
+    if (!canvas || !image) {
+      console.log('Canvas or image not available');
+      return;
+    }
+
+    const ctx = canvas.getContext('2d');
+    const rect = image.getBoundingClientRect();
+    
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    console.log('Drawing boxes - Image size:', imageSize, 'Display size:', rect.width, 'x', rect.height);
+    console.log('Detections:', detections.length);
+
+    const scaleX = rect.width / imageSize.width;
+    const scaleY = rect.height / imageSize.height;
+
+    detections.forEach((detection, index) => {
+      if (detection.bbox) {
+        console.log(`Detection ${index}:`, detection.label, 'bbox:', detection.bbox);
+        
+        // Handle nested array structure - bbox is [[xmax, ymax, xmin, ymin]]
+        const bboxArray = Array.isArray(detection.bbox[0]) ? detection.bbox[0] : detection.bbox;
+        const [xmax, ymax, xmin, ymin] = bboxArray;
+        
+        const x = xmin * scaleX;
+        const y = ymin * scaleY;
+        const width = (xmax - xmin) * scaleX;
+        const height = (ymax - ymin) * scaleY;
+
+        console.log(`Drawing box at: x=${x}, y=${y}, w=${width}, h=${height}`);
+
+        const isViolation = detection.label.toLowerCase().includes("no") || 
+                          detection.label.toLowerCase().includes("violation");
+        const color = isViolation ? '#ef4444' : '#10b981';
+
+        // Draw bounding box
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(x, y, width, height);
+
+        // Draw label background
+        const label = `${detection.label.replace(/_/g, ' ')} ${(detection.confidence * 100).toFixed(0)}%`;
+        ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+        const textMetrics = ctx.measureText(label);
+        const textHeight = 20;
+        const padding = 8;
+
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y - textHeight - padding, textMetrics.width + padding * 2, textHeight + padding);
+
+        // Draw label text
+        ctx.fillStyle = 'white';
+        ctx.fillText(label, x + padding, y - padding);
+
+        // Draw corner decorations
+        const cornerSize = 15;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 4;
+        
+        // Top-left corner
+        ctx.beginPath();
+        ctx.moveTo(x, y + cornerSize);
+        ctx.lineTo(x, y);
+        ctx.lineTo(x + cornerSize, y);
+        ctx.stroke();
+        
+        // Top-right corner
+        ctx.beginPath();
+        ctx.moveTo(x + width - cornerSize, y);
+        ctx.lineTo(x + width, y);
+        ctx.lineTo(x + width, y + cornerSize);
+        ctx.stroke();
+        
+        // Bottom-left corner
+        ctx.beginPath();
+        ctx.moveTo(x, y + height - cornerSize);
+        ctx.lineTo(x, y + height);
+        ctx.lineTo(x + cornerSize, y + height);
+        ctx.stroke();
+        
+        // Bottom-right corner
+        ctx.beginPath();
+        ctx.moveTo(x + width - cornerSize, y + height);
+        ctx.lineTo(x + width, y + height);
+        ctx.lineTo(x + width, y + height - cornerSize);
+        ctx.stroke();
+      } else {
+        console.log(`Detection ${index} has no bbox:`, detection);
+      }
+    });
+
+    console.log('Finished drawing boxes');
+  };
+
   const playNotificationSound = () => {
-    // Create a simple beep sound
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
@@ -103,7 +228,6 @@ function ImageDetection() {
       const data = await res.json();
       setDetections(data.detections);
       
-      // Update statistics
       const violations = data.detections.filter(d => 
         d.label.toLowerCase().includes("no") || 
         d.label.toLowerCase().includes("violation")
@@ -116,7 +240,6 @@ function ImageDetection() {
       };
       setStats(newStats);
 
-      // Add to history
       const newEntry = {
         id: Date.now(),
         timestamp: new Date().toLocaleString(),
@@ -127,17 +250,15 @@ function ImageDetection() {
         details: data.detections
       };
       
-      const updatedHistory = [newEntry, ...history.slice(0, 19)]; // Keep last 20
+      const updatedHistory = [newEntry, ...history.slice(0, 19)];
       setHistory(updatedHistory);
       localStorage.setItem("ppeHistory", JSON.stringify(updatedHistory));
 
-      // Handle notifications
       if (data.notification_sent && violations > 0) {
         setNotificationMessage(`${violations} violation(s) detected! SMS notification sent.`);
         setShowNotificationAlert(true);
         playNotificationSound();
       } else if (violations > 0) {
-        // If backend doesn't send notification status, show based on violations
         setNotificationMessage(`${violations} violation(s) detected! Sending SMS notification...`);
         setShowNotificationAlert(true);
         playNotificationSound();
@@ -155,6 +276,7 @@ function ImageDetection() {
     setFile(null);
     setPreview(null);
     setDetections([]);
+    setImageSize({ width: 0, height: 0 });
   };
 
   const clearHistory = () => {
@@ -221,7 +343,6 @@ function ImageDetection() {
 
   return (
     <div className="app-container">
-      {/* Notification Alert */}
       {showNotificationAlert && (
         <div className="notification-alert">
           <div className="alert-icon">🚨</div>
@@ -238,7 +359,6 @@ function ImageDetection() {
         </div>
       )}
 
-      {/* Header */}
       <header className="header">
         <div className="header-content">
           <div className="logo-section">
@@ -276,7 +396,6 @@ function ImageDetection() {
       </header>
 
       <div className="main-content">
-        {/* Stats Cards */}
         <div className="stats-grid">
           <div className="stat-card">
             <div className="stat-icon" style={{ background: "linear-gradient(135deg, #3b82f6, #2563eb)" }}>📊</div>
@@ -311,7 +430,6 @@ function ImageDetection() {
         </div>
 
         <div className="content-grid">
-          {/* Upload Section */}
           <div className="card upload-card">
             <h2 className="card-title">
               <span>📤</span> Upload Image
@@ -320,7 +438,35 @@ function ImageDetection() {
             <div className="upload-area">
               {preview ? (
                 <div className="preview-container">
-                  <img src={preview} alt="Preview" className="preview-image" />
+                  <div className="image-wrapper">
+                    <img 
+                      ref={imageRef}
+                      src={preview} 
+                      alt="Preview" 
+                      className="preview-image"
+                      onLoad={() => {
+                        if (detections.length > 0) {
+                          drawBoundingBoxes();
+                        }
+                      }}
+                    />
+                    <canvas 
+                      ref={canvasRef}
+                      className="bounding-box-canvas"
+                    />
+                  </div>
+                  {detections.length > 0 && (
+                    <div className="detection-legend">
+                      <div className="legend-item">
+                        <div className="legend-box violation-box"></div>
+                        <span>Violations</span>
+                      </div>
+                      <div className="legend-item">
+                        <div className="legend-box safe-box"></div>
+                        <span>Compliant</span>
+                      </div>
+                    </div>
+                  )}
                   <button className="remove-btn" onClick={resetForm}>
                     ✕ Remove
                   </button>
@@ -375,7 +521,6 @@ function ImageDetection() {
             </div>
           </div>
 
-          {/* Detection Results */}
           <div className="card results-card">
             <div className="results-header">
               <h2 className="card-title">
@@ -440,6 +585,14 @@ function ImageDetection() {
                           }}
                         ></div>
                       </div>
+                      {d.bbox && (
+                        <div className="bbox-info">
+                          <span className="bbox-icon">📍</span>
+                          <span className="bbox-text">
+                            Box: [{d.bbox.map(v => typeof v === 'number' ? Math.round(v) : v).join(', ')}]
+                          </span>
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
@@ -448,7 +601,6 @@ function ImageDetection() {
           </div>
         </div>
 
-        {/* History Section */}
         {history.length > 0 && (
           <div className="card history-card">
             <div className="history-header">
@@ -501,7 +653,6 @@ function ImageDetection() {
         )}
       </div>
 
-      {/* Footer */}
       <footer className="footer">
         <p>Safety AI Dashboard v2.0 | Powered by YOLO & FastAPI | Total Scans: {history.length}</p>
       </footer>

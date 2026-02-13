@@ -419,16 +419,75 @@ body {
 .preview-container {
   position: relative;
   border-radius: 12px;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.image-wrapper {
+  position: relative;
+  width: 100%;
+  display: inline-block;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 .preview-image {
   width: 100%;
-  height: 300px;
-  object-fit: cover;
+  max-height: 400px;
+  object-fit: contain;
   border-radius: 12px;
   display: block;
+  background: #000;
+}
+
+.bounding-box-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.detection-legend {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  padding: 12px 16px;
+  border-radius: 10px;
+  display: flex;
+  gap: 16px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  z-index: 20;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.legend-box {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 3px solid;
+}
+
+.violation-box {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.safe-box {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
 }
 
 .remove-btn {
@@ -445,6 +504,7 @@ body {
   font-weight: 600;
   transition: all 0.2s;
   backdrop-filter: blur(10px);
+  z-index: 30;
 }
 
 .remove-btn:hover {
@@ -699,6 +759,28 @@ body {
   height: 100%;
   border-radius: 4px;
   transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.bbox-info {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: var(--hover-bg);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  border: 1px solid var(--border-color);
+}
+
+.bbox-icon {
+  font-size: 14px;
+}
+
+.bbox-text {
+  color: var(--text-secondary);
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
 }
 
 /* History Table */
