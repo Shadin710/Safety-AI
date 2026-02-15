@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import "./VideoDetection.css";
 
 function VideoDetection() {
@@ -11,11 +11,99 @@ function VideoDetection() {
   const [notifications, setNotifications] = useState([]);
   const [stats, setStats] = useState({ total: 0, violations: 0, safe: 0 });
   const [processingSpeed, setProcessingSpeed] = useState(0);
+  const [currentFrame, setCurrentFrame] = useState(0);
+  const [videoSize, setVideoSize] = useState({ width: 0, height: 0 });
   const videoRef = useRef(null);
+  const canvasRef = useRef(null);
   const [showNotificationAlert, setShowNotificationAlert] = useState(false);
 
+  const drawBoundingBoxes = useCallback(() => {
+    const canvas = canvasRef.current;
+    const video = videoRef.current;
+    
+    if (!canvas || !video || videoSize.width === 0 || videoSize.height === 0) {
+      return;
+    }
+
+    const ctx = canvas.getContext('2d');
+    const rect = video.getBoundingClientRect();
+    
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Since backend doesn't send frame numbers, show ALL detections
+    const currentFrameDetections = detections;
+
+    if (currentFrameDetections.length === 0) {
+      return;
+    }
+
+    const scaleX = rect.width / videoSize.width;
+    const scaleY = rect.height / videoSize.height;
+
+    currentFrameDetections.forEach((detection, idx) => {
+      if (detection.bbox) {
+        const bboxArray = Array.isArray(detection.bbox[0]) ? detection.bbox[0] : detection.bbox;
+        const [xmax, ymax, xmin, ymin] = bboxArray;
+        
+        const x = xmin * scaleX;
+        const y = ymin * scaleY;
+        const width = (xmax - xmin) * scaleX;
+        const height = (ymax - ymin) * scaleY;
+
+        const isViolation = detection.label.toLowerCase().includes("no") || 
+                          detection.label.toLowerCase().includes("violation");
+        const color = isViolation ? '#ef4444' : '#10b981';
+
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(x, y, width, height);
+
+        const label = `${detection.label.replace(/_/g, ' ')} ${(detection.confidence * 100).toFixed(0)}%`;
+        ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+        const textMetrics = ctx.measureText(label);
+        const textHeight = 20;
+        const padding = 8;
+
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y - textHeight - padding, textMetrics.width + padding * 2, textHeight + padding);
+
+        ctx.fillStyle = 'white';
+        ctx.fillText(label, x + padding, y - padding);
+
+        const cornerSize = 15;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 4;
+        
+        ctx.beginPath();
+        ctx.moveTo(x, y + cornerSize);
+        ctx.lineTo(x, y);
+        ctx.lineTo(x + cornerSize, y);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(x + width - cornerSize, y);
+        ctx.lineTo(x + width, y);
+        ctx.lineTo(x + width, y + cornerSize);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(x, y + height - cornerSize);
+        ctx.lineTo(x, y + height);
+        ctx.lineTo(x + cornerSize, y + height);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(x + width - cornerSize, y + height);
+        ctx.lineTo(x + width, y + height);
+        ctx.lineTo(x + width, y + height - cornerSize);
+        ctx.stroke();
+      }
+    });
+  }, [detections, videoSize]);
+
   useEffect(() => {
-    // Auto-hide notification alert after 5 seconds
     if (showNotificationAlert) {
       const timer = setTimeout(() => {
         setShowNotificationAlert(false);
@@ -24,16 +112,37 @@ function VideoDetection() {
     }
   }, [showNotificationAlert]);
 
+  useEffect(() => {
+    if (detections.length > 0 && videoRef.current && canvasRef.current) {
+      // Use requestAnimationFrame for smooth rendering
+      const animationId = requestAnimationFrame(() => {
+        drawBoundingBoxes();
+      });
+      return () => cancelAnimationFrame(animationId);
+    }
+  }, [drawBoundingBoxes, detections.length]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (detections.length > 0) {
+        requestAnimationFrame(() => {
+          drawBoundingBoxes();
+        });
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [detections.length, drawBoundingBoxes]);
+
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
-      // Validate file size (max 100MB for videos)
       if (selectedFile.size > 100 * 1024 * 1024) {
         alert("File size must be less than 100MB");
         return;
       }
 
-      // Validate file type
       const validTypes = ["video/mp4", "video/avi", "video/mov", "video/webm"];
       if (!validTypes.includes(selectedFile.type)) {
         alert("Please upload a valid video file (MP4, AVI, MOV, WEBM)");
@@ -43,16 +152,32 @@ function VideoDetection() {
       setFile(selectedFile);
       const url = URL.createObjectURL(selectedFile);
       setPreview(url);
+      setDetections([]);
 
-      // Get video duration and estimate frames
       const video = document.createElement('video');
       video.src = url;
       video.onloadedmetadata = () => {
-        const estimatedFrames = Math.floor(video.duration * 30); // Assuming 30fps
+        const estimatedFrames = Math.floor(video.duration * 30);
         setTotalFrames(estimatedFrames);
+        setVideoSize({ width: video.videoWidth, height: video.videoHeight });
       };
     }
   };
+
+  const handleVideoTimeUpdate = useCallback(() => {
+    if (videoRef.current) {
+      const fps = 30;
+      const frame = Math.floor(videoRef.current.currentTime * fps);
+      
+      // Only update if frame actually changed
+      setCurrentFrame(prevFrame => {
+        if (prevFrame !== frame) {
+          return frame;
+        }
+        return prevFrame;
+      });
+    }
+  }, []);
 
   const processVideo = async () => {
     if (!file) return alert("Please select a video first");
@@ -66,7 +191,7 @@ function VideoDetection() {
     formData.append("file", file);
 
     try {
-      const res = await fetch("http://127.0.0.1:8001/detect-videos", {
+      const res = await fetch("http://127.0.0.1:8001/detect-video", {
         method: "POST",
         body: formData,
       });
@@ -77,12 +202,18 @@ function VideoDetection() {
 
       const data = await res.json();
       
-      // Process response
+      console.log('=== Video Processing Complete ===');
+      console.log('Response from backend:', data);
+      console.log('Total detections received:', data.detections?.length);
+      if (data.detections && data.detections.length > 0) {
+        console.log('Sample detection:', data.detections[0]);
+        console.log('All unique frames:', [...new Set(data.detections.map(d => d.frame))].sort((a, b) => a - b));
+      }
+      
       setDetections(data.detections || []);
       setProcessedFrames(data.total_frames || 0);
       setTotalFrames(data.total_frames || 0);
 
-      // Calculate statistics
       const violations = (data.detections || []).filter(d => 
         d.label.toLowerCase().includes("no") || 
         d.label.toLowerCase().includes("violation")
@@ -95,11 +226,9 @@ function VideoDetection() {
       };
       setStats(newStats);
 
-      // Calculate processing speed
       const processingTime = (Date.now() - startTime) / 1000;
       setProcessingSpeed(parseFloat((data.total_frames / processingTime).toFixed(2)));
 
-      // Handle notifications
       if (data.notifications_sent && violations > 0) {
         const newNotifications = [{
           id: Date.now(),
@@ -110,8 +239,6 @@ function VideoDetection() {
         }];
         setNotifications(prev => [...newNotifications, ...prev]);
         setShowNotificationAlert(true);
-
-        // Play notification sound (optional)
         playNotificationSound();
       }
 
@@ -124,7 +251,6 @@ function VideoDetection() {
   };
 
   const playNotificationSound = () => {
-    // Create a simple beep sound
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
@@ -150,6 +276,8 @@ function VideoDetection() {
     setTotalFrames(0);
     setStats({ total: 0, violations: 0, safe: 0 });
     setProcessingSpeed(0);
+    setCurrentFrame(0);
+    setVideoSize({ width: 0, height: 0 });
     if (videoRef.current) {
       videoRef.current.pause();
       videoRef.current.currentTime = 0;
@@ -170,9 +298,23 @@ function VideoDetection() {
 
   const progress = totalFrames > 0 ? (processedFrames / totalFrames) * 100 : 0;
 
+  const uniqueDetections = detections.reduce((acc, detection) => {
+    const existing = acc.find(d => d.label === detection.label);
+    if (existing) {
+      existing.count += 1;
+      existing.frames.push(detection.frame);
+    } else {
+      acc.push({
+        ...detection,
+        count: 1,
+        frames: [detection.frame]
+      });
+    }
+    return acc;
+  }, []);
+
   return (
     <div className="video-detection-container">
-      {/* Notification Alert */}
       {showNotificationAlert && (
         <div className="notification-alert">
           <div className="alert-icon">🚨</div>
@@ -189,7 +331,6 @@ function VideoDetection() {
         </div>
       )}
 
-      {/* Header */}
       <header className="video-header">
         <div className="header-content">
           <div className="logo-section">
@@ -211,7 +352,6 @@ function VideoDetection() {
       </header>
 
       <div className="main-content">
-        {/* Stats Cards */}
         <div className="stats-grid">
           <div className="stat-card">
             <div className="stat-icon" style={{ background: "linear-gradient(135deg, #3b82f6, #2563eb)" }}>
@@ -252,7 +392,6 @@ function VideoDetection() {
         </div>
 
         <div className="content-grid">
-          {/* Upload and Preview Section */}
           <div className="card upload-card">
             <h2 className="card-title">
               <span>📤</span> Upload Video
@@ -261,12 +400,39 @@ function VideoDetection() {
             <div className="upload-area">
               {preview ? (
                 <div className="preview-container">
-                  <video
-                    ref={videoRef}
-                    src={preview}
-                    controls
-                    className="preview-video"
-                  />
+                  <div className="video-wrapper">
+                    <video
+                      ref={videoRef}
+                      src={preview}
+                      controls
+                      className="preview-video"
+                      onTimeUpdate={handleVideoTimeUpdate}
+                      onLoadedMetadata={() => {
+                        if (videoRef.current) {
+                          setVideoSize({
+                            width: videoRef.current.videoWidth,
+                            height: videoRef.current.videoHeight
+                          });
+                        }
+                      }}
+                    />
+                    <canvas 
+                      ref={canvasRef}
+                      className="bounding-box-canvas"
+                    />
+                  </div>
+                  {detections.length > 0 && (
+                    <div className="detection-legend">
+                      <div className="legend-item">
+                        <div className="legend-box violation-box"></div>
+                        <span>Violations</span>
+                      </div>
+                      <div className="legend-item">
+                        <div className="legend-box safe-box"></div>
+                        <span>Compliant</span>
+                      </div>
+                    </div>
+                  )}
                   <button className="remove-btn" onClick={resetForm}>
                     ✕ Remove
                   </button>
@@ -298,7 +464,6 @@ function VideoDetection() {
               </div>
             )}
 
-            {/* Processing Progress */}
             {isProcessing && (
               <div className="progress-section">
                 <div className="progress-header">
@@ -344,7 +509,6 @@ function VideoDetection() {
             </div>
           </div>
 
-          {/* Detection Results */}
           <div className="card results-card">
             <h2 className="card-title">
               <span>🎯</span> Detection Results
@@ -358,7 +522,7 @@ function VideoDetection() {
               </div>
             ) : (
               <div className="detections-list">
-                {detections.map((d, index) => (
+                {uniqueDetections.map((d, index) => (
                   <div key={index} className="detection-item">
                     <div className="detection-header">
                       <div className="detection-label-section">
@@ -368,9 +532,9 @@ function VideoDetection() {
                         >
                           {d.label.replace(/_/g, " ")}
                         </span>
-                        {d.frame && (
-                          <span className="frame-badge">Frame {d.frame}</span>
-                        )}
+                        <span className="detection-count-badge">
+                          {d.count}x
+                        </span>
                       </div>
                       <span className="detection-confidence">
                         {(d.confidence * 100).toFixed(1)}%
@@ -385,6 +549,22 @@ function VideoDetection() {
                         }}
                       ></div>
                     </div>
+                    {d.frames && d.frames.length > 0 && (
+                      <div className="frame-info">
+                        <span className="frame-icon">🎞️</span>
+                        <span className="frame-text">
+                          Frames: {d.frames.slice(0, 5).join(', ')}{d.frames.length > 5 ? '...' : ''}
+                        </span>
+                      </div>
+                    )}
+                    {d.bbox && (
+                      <div className="bbox-info">
+                        <span className="bbox-icon">📍</span>
+                        <span className="bbox-text">
+                          Box: [{(Array.isArray(d.bbox[0]) ? d.bbox[0] : d.bbox).map(v => typeof v === 'number' ? Math.round(v) : v).join(', ')}]
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -392,7 +572,6 @@ function VideoDetection() {
           </div>
         </div>
 
-        {/* Notifications Section */}
         {notifications.length > 0 && (
           <div className="card notifications-card">
             <h2 className="card-title">

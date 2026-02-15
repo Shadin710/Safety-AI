@@ -39,7 +39,7 @@ async def detect_image(file: UploadFile=File(...)):
     img = cv2.imread(filepath)
 
     
-    severity, event_type, detections = detect_violation(img,filepath)
+    severity, event_type, detections = detect_violation(img,filepath,1)
     print(severity) 
     if severity == "HIGH":
         try:
@@ -82,10 +82,10 @@ async def detect_videos(file: UploadFile=File(...)):
         frame_count+=1
 
         
-        if frame_count%30 !=0:
+        if frame_count%40 !=0:
             continue
 
-        severity,event_type,detections = detect_violation(frame,filepath)
+        severity,event_type,detections = detect_violation(frame,filepath,frame_count)
         if severity == "HIGH":
             violations += 1
         

@@ -8,7 +8,7 @@ import requests
 from datetime import datetime
 # loading YOLO model
 model = YOLO("last.pt")
-def detect_violation(img,filepath):
+def detect_violation(img,filepath,frame):
     # will load this model in executor in future
     results = model(img)
 
@@ -24,6 +24,7 @@ def detect_violation(img,filepath):
                 detections.append({
                     "label": model.names[int(box.cls)],
                     "confidence": float(box.conf),
+                    "frame": frame,
                     "bbox": box.xyxy.tolist()
                 })
         if "Person" in labels and "NO-Hardhat" in labels:
