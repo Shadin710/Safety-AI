@@ -35,3 +35,7 @@ jobs:
         run: |
           cd backend-api
           python -c "import main; print('Backend imports OK')"
+      - name: Run Tests
+        run: |
+          cd backend-api
+          pytest
