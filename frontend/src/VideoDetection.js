@@ -401,7 +401,7 @@ function VideoDetection() {
                       src={preview}
                       controls
                       className="preview-video"
-                      onTimeUpdate={handleVideoTimeUpdate}
+                      
                       onLoadedMetadata={() => {
                         if (videoRef.current) {
                           setVideoSize({
