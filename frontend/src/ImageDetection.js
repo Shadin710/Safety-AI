@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import "./ImageDetection.css";
 
 function ImageDetection() {
@@ -17,80 +17,7 @@ function ImageDetection() {
   const canvasRef = useRef(null);
   const imageRef = useRef(null);
 
-  useEffect(() => {
-    const savedHistory = localStorage.getItem("ppeHistory");
-    if (savedHistory) {
-      setHistory(JSON.parse(savedHistory));
-    }
-
-    const savedDarkMode = localStorage.getItem("darkMode");
-    if (savedDarkMode === "true") {
-      setDarkMode(true);
-      document.documentElement.classList.add("dark-mode");
-    }
-  }, []);
-
-  useEffect(() => {
-    if (showNotificationAlert) {
-      const timer = setTimeout(() => {
-        setShowNotificationAlert(false);
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [showNotificationAlert]);
-
-  useEffect(() => {
-    if (detections.length > 0 && imageRef.current && canvasRef.current && preview) {
-      // Small delay to ensure image is rendered
-      setTimeout(() => {
-        drawBoundingBoxes();
-      }, 100);
-    }
-  }, [detections, imageSize, preview]);
-
-  useEffect(() => {
-    // Redraw on window resize
-    const handleResize = () => {
-      if (detections.length > 0) {
-        drawBoundingBoxes();
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [detections]);
-
-  const handleFileChange = (e) => {
-    const selectedFile = e.target.files[0];
-    if (selectedFile) {
-      if (selectedFile.size > 10 * 1024 * 1024) {
-        alert("File size must be less than 10MB");
-        return;
-      }
-
-      const validTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-      if (!validTypes.includes(selectedFile.type)) {
-        alert("Please upload a valid image file (JPEG, PNG, WEBP)");
-        return;
-      }
-
-      setFile(selectedFile);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreview(reader.result);
-        setDetections([]);
-        
-        const img = new Image();
-        img.onload = () => {
-          setImageSize({ width: img.width, height: img.height });
-        };
-        img.src = reader.result;
-      };
-      reader.readAsDataURL(selectedFile);
-    }
-  };
-
-  const drawBoundingBoxes = () => {
+    const drawBoundingBoxes = useCallback(() => {
     const canvas = canvasRef.current;
     const image = imageRef.current;
     
@@ -188,7 +115,82 @@ function ImageDetection() {
     });
 
     console.log('Finished drawing boxes');
+  },[detections, imageSize]);
+
+  useEffect(() => {
+    const savedHistory = localStorage.getItem("ppeHistory");
+    if (savedHistory) {
+      setHistory(JSON.parse(savedHistory));
+    }
+
+    const savedDarkMode = localStorage.getItem("darkMode");
+    if (savedDarkMode === "true") {
+      setDarkMode(true);
+      document.documentElement.classList.add("dark-mode");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showNotificationAlert) {
+      const timer = setTimeout(() => {
+        setShowNotificationAlert(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showNotificationAlert]);
+
+  useEffect(() => {
+    if (detections.length > 0 && imageRef.current && canvasRef.current && preview) {
+      setTimeout(() => {
+        drawBoundingBoxes();
+      }, 100);
+    }
+  }, [detections, imageSize, preview, drawBoundingBoxes]);
+
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (detections.length > 0) {
+        drawBoundingBoxes();
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [detections, drawBoundingBoxes]);
+
+
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files[0];
+    if (selectedFile) {
+      if (selectedFile.size > 10 * 1024 * 1024) {
+        alert("File size must be less than 10MB");
+        return;
+      }
+
+      const validTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+      if (!validTypes.includes(selectedFile.type)) {
+        alert("Please upload a valid image file (JPEG, PNG, WEBP)");
+        return;
+      }
+
+      setFile(selectedFile);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreview(reader.result);
+        setDetections([]);
+        
+        const img = new Image();
+        img.onload = () => {
+          setImageSize({ width: img.width, height: img.height });
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(selectedFile);
+    }
   };
+
+
 
   const playNotificationSound = () => {
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
