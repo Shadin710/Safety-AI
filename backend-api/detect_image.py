@@ -1,61 +1,49 @@
-from ultralytics import  YOLO
-import cv2
-import os
-import uuid
+from ultralytics import YOLO
 from db import SessionLocal
 from models import Event
-import requests
-from datetime import datetime
-# loading YOLO model
+from logic import decide_event
+
 model = YOLO("last.pt")
-def detect_violation(img,filepath,frame):
-    # will load this model in executor in future
+
+def detect_violation(img, filepath, frame):
+
     results = model(img)
 
     detections = []
-    db= SessionLocal()
     labels = []
+
     for r in results:
         for box in r.boxes:
-            label =model.names[int(box.cls)]
-            labels.append(model.names[int(box.cls)])
+            label = model.names[int(box.cls)]
+            labels.append(label)
+
             confidence = float(box.conf)
-            if label != "Person" and label!="Hardhat" and label!="machinery":
+
+            if label not in ["Person", "Hardhat", "machinery"]:
                 detections.append({
-                    "label": model.names[int(box.cls)],
-                    "confidence": float(box.conf),
+                    "label": label,
+                    "confidence": confidence,
                     "frame": frame,
                     "bbox": box.xyxy.tolist()
                 })
-        if "Person" in labels and "NO-Hardhat" in labels:
-            event_type = "PPE_VIOLATION"
-            severity = "HIGH"
-            event = Event(
-                event_type=event_type,
-                severity=severity,
-                label=label,
-                confidence = confidence, 
-                image_path=filepath
-            )
 
-            db.add(event)
-        elif "Person" in labels and "NO-Safety Vest" in labels:
-            event_type = "PPE_VIOLATION"
-            severity = "HIGH"
-            event = Event(
-                event_type=event_type,
-                severity=severity,
-                label=label,
-                confidence = confidence,
-                image_path=filepath
-            )
+    # decide severity based on labels
+    event_type, severity = decide_event(labels)
 
-            db.add(event)
+    # store in DB only if HIGH
+    if severity == "HIGH":
+        db = SessionLocal()
 
-        else:
-            event_type ="Normal"
-            severity = "LOW"
-    
-    db.commit()
-    db.close()
-    return severity,event_type,detections
+        event = Event(
+            event_type=event_type,
+            severity=severity,
+            label=",".join(labels),
+            confidence=1.0,
+            image_path=filepath
+        )
+
+        db.add(event)
+        db.commit()
+        db.close()
+
+    return severity, event_type, detections
