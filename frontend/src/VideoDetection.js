@@ -11,7 +11,7 @@ function VideoDetection() {
   const [notifications, setNotifications] = useState([]);
   const [stats, setStats] = useState({ total: 0, violations: 0, safe: 0 });
   const [processingSpeed, setProcessingSpeed] = useState(0);
-  const [currentFrame, setCurrentFrame] = useState(0);
+  // const [currentFrame, setCurrentFrame] = useState(0);
   const [videoSize, setVideoSize] = useState({ width: 0, height: 0 });
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -170,12 +170,7 @@ function VideoDetection() {
       const frame = Math.floor(videoRef.current.currentTime * fps);
       
       // Only update if frame actually changed
-      setCurrentFrame(prevFrame => {
-        if (prevFrame !== frame) {
-          return frame;
-        }
-        return prevFrame;
-      });
+
     }
   }, []);
 
@@ -191,7 +186,7 @@ function VideoDetection() {
     formData.append("file", file);
 
     try {
-      const res = await fetch("http://127.0.0.1:8001/detect-video", {
+      const res = await fetch("http://127.0.0.1:8001/detect-videos", {
         method: "POST",
         body: formData,
       });
@@ -276,7 +271,7 @@ function VideoDetection() {
     setTotalFrames(0);
     setStats({ total: 0, violations: 0, safe: 0 });
     setProcessingSpeed(0);
-    setCurrentFrame(0);
+    // setCurrentFrame(0);
     setVideoSize({ width: 0, height: 0 });
     if (videoRef.current) {
       videoRef.current.pause();
