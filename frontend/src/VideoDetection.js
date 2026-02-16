@@ -164,15 +164,15 @@ function VideoDetection() {
     }
   };
 
-  const handleVideoTimeUpdate = useCallback(() => {
-    if (videoRef.current) {
-      const fps = 30;
-      const frame = Math.floor(videoRef.current.currentTime * fps);
+  // const handleVideoTimeUpdate = useCallback(() => {
+  //   if (videoRef.current) {
+  //     const fps = 30;
+  //     const frame = Math.floor(videoRef.current.currentTime * fps);
       
-      // Only update if frame actually changed
+  //     // Only update if frame actually changed
 
-    }
-  }, []);
+  //   }
+  // }, []);
 
   const processVideo = async () => {
     if (!file) return alert("Please select a video first");
