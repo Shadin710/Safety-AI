@@ -126,3 +126,6 @@ def get_events():
         }
         for e in events
     ]
+@app.get("/health")
+def health():
+    return {"status":"ok"}
