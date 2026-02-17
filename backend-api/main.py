@@ -9,6 +9,7 @@ from models import Event
 import requests
 from datetime import datetime
 from detect_image import detect_violation
+import init
 
 
 # loading fastapi
@@ -44,7 +45,7 @@ async def detect_image(file: UploadFile=File(...)):
     if severity == "HIGH":
         try:
             res = requests.post(
-                "http://localhost:5678/webhook-test/safety-ai",
+                "http://n8n:5678/webhook-test/safety-ai",
                 json={
                     "event_type": event_type,
                     "severity": severity,
@@ -93,7 +94,7 @@ async def detect_videos(file: UploadFile=File(...)):
             violations=0
             try:
                 res = requests.post(
-                    "http://localhost:5678/webhook-test/safety-ai",
+                    "http://n8n:5678/webhook-test/safety-ai",
                     json={
                         "event_type": event_type,
                         "severity": severity,
