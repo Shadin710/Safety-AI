@@ -3,3 +3,5 @@ runs
 /backend-api/uploads
 /frontend/node_modules
 /backend-api/.env
+/n8n/credentials
+/backend-api/.pytest_cache

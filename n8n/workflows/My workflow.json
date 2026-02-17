@@ -1,0 +1,115 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "safety-ai",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "91457e6e-0407-4f6d-b032-efdbd7a79655",
+      "name": "Webhook",
+      "webhookId": "fdc34bb9-6972-4bec-9bc3-cd105b0cc96d"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "baedf811-cd54-4c52-bf81-18b6dfbba147",
+              "leftValue": "={{$json[\"severity\"]}}",
+              "rightValue": "HIGH",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        208,
+        0
+      ],
+      "id": "ae20b198-0952-4429-acd8-33f2422778f3",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "from": "+12056221577",
+        "to": "+61479060864",
+        "message": "PPE Violation detected",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        416,
+        -96
+      ],
+      "id": "366354d0-4e59-4e71-8ec9-91ad21258f52",
+      "name": "Send an SMS/MMS/WhatsApp message",
+      "credentials": {
+        "twilioApi": {
+          "id": "jL36igO5XMefcSTw",
+          "name": "Twilio account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send an SMS/MMS/WhatsApp message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "691ded28-9120-4975-a13c-b5ec7124755e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "285d26560cf613f214f40eb97c0bc05f63612404a0e7df727d59f7ce321866b3"
+  },
+  "id": "EGhnlPhGvGMyMJI92G3YU",
+  "tags": []
+}
