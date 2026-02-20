@@ -218,7 +218,7 @@ function ImageDetection() {
     formData.append("file", file);
 
     try {
-      const res = await fetch("http://127.0.0.1:8001/detect-image", {
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/detect-image`, {
         method: "POST",
         body: formData,
       });

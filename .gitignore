@@ -5,3 +5,4 @@ runs
 /backend-api/.env
 /n8n/credentials
 /backend-api/.pytest_cache
+/frontend/.env
