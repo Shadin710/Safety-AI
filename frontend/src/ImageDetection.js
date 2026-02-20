@@ -16,6 +16,8 @@ function ImageDetection() {
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
   const canvasRef = useRef(null);
   const imageRef = useRef(null);
+  const API_URL = process.env.REACT_APP_API_URL;
+
 
     const drawBoundingBoxes = useCallback(() => {
     const canvas = canvasRef.current;
@@ -218,7 +220,7 @@ function ImageDetection() {
     formData.append("file", file);
 
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/detect-image`, {
+      const res = await fetch(`${API_URL}/detect-image`, {
         method: "POST",
         body: formData,
       });

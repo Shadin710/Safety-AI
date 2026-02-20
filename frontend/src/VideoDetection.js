@@ -16,6 +16,8 @@ function VideoDetection() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [showNotificationAlert, setShowNotificationAlert] = useState(false);
+  const API_URL = process.env.REACT_APP_API_URL;
+
 
   const drawBoundingBoxes = useCallback(() => {
     const canvas = canvasRef.current;
@@ -186,7 +188,7 @@ function VideoDetection() {
     formData.append("file", file);
 
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/detect-videos`, {
+      const res = await fetch(`${API_URL}/detect-videos`, {
         method: "POST",
         body: formData,
       });
