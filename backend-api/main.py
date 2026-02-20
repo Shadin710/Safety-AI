@@ -10,7 +10,7 @@ import requests
 from datetime import datetime
 from detect_image import detect_violation
 import init
-
+ 
 
 # loading fastapi
 app =FastAPI()
