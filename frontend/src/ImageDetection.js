@@ -220,7 +220,7 @@ function ImageDetection() {
     formData.append("file", file);
 
     try {
-      const res = await fetch(`${API_URL}/detect-image`, {
+      const res = await fetch(`https://safety-ai-70ex.onrender.com/detect-image`, {
         method: "POST",
         body: formData,
       });

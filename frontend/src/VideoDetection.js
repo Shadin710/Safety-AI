@@ -188,7 +188,7 @@ function VideoDetection() {
     formData.append("file", file);
 
     try {
-      const res = await fetch(`${API_URL}/detect-videos`, {
+      const res = await fetch(`https://safety-ai-70ex.onrender.com/detect-videos`, {
         method: "POST",
         body: formData,
       });
