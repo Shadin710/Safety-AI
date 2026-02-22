@@ -492,6 +492,4 @@ Author Name: MD Moshiur Rahman
 
 MIT License
 
-------------------------------------------------------------------------
 
-⭐ Full-stack AI system with production-ready deployment.
